@@ -1,7 +1,11 @@
-something there will be soon
-  _____________ __________________________________ 
- /   _____/    |   \______   \_   _____/\______   \
- \_____  \|    |   /|     ___/|    __)_  |       _/
- /        \    |  / |    |    |        \ |    |   \
-/_______  /______/  |____|   /_______  / |____|_  /
-        \/                           \/         \/ 
+# Warehouse Accounting
+
+## How to launch:
+Download file from github
+
+	git clone https://github.com/mXd-mXn/warehouse-accounting.git
+
+Launch file
+
+	bash
+	java Main.java
