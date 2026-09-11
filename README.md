@@ -7,5 +7,4 @@ Download file from github
 
 Launch file
 
-	bash
 	java Main.java
