@@ -5,6 +5,10 @@ Download file from github
 
 	git clone https://github.com/mXd-mXn/warehouse-accounting.git
 
+Compile code
+
+	javac Main.java
+	
 Launch file
 
-	java Main.java
+	java Main
