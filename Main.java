@@ -36,4 +36,6 @@ System.out.printf("Total product value: %.2f%n", totalValue);
 System.out.printf("Total product weight: %.2f%n", totalWeight);
 System.out.printf("Status: %s%n", stockStatus);
 System.out.printf("Is product avalible: %b%n", isInStock);
+
+scanner.close();
 }
