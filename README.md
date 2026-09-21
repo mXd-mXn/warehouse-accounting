@@ -9,8 +9,6 @@ A modular Java-based command-line application designed for warehouse inventory m
 
 # Lab 2: Processing Arrays Using Loops
 
-**Domain:** Warehouse accounting
-
 ## Description
 The project implements a console application for managing an array of products (`Product`). 
 The program allows you to:
