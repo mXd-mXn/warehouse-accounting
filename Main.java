@@ -1,4 +1,37 @@
+import java.util.InputMismatchException;
 import java.util.Scanner;
+
+abstract class WarehouseException extends Exception {
+    public WarehouseException(String message) {
+        super(message);
+    }
+}
+
+class InvalidPriceException extends WarehouseException {
+    private final double invalidPrice;
+
+    public InvalidPriceException(String message, double invalidPrice) {
+        super(message);
+        this.invalidPrice = invalidPrice;
+    }
+
+    public double getInvalidPrice() {
+        return invalidPrice;
+    }
+}
+
+class InvalidQuantityException extends WarehouseException {
+    private final int invalidQuantity;
+
+    public InvalidQuantityException(String message, int invalidQuantity) {
+        super(message);
+        this.invalidQuantity = invalidQuantity;
+    }
+
+    public int getInvalidQuantity() {
+        return invalidQuantity;
+    }
+}
 
 record Product(String name, String sku, int quantity, double price) {
     @Override
@@ -9,84 +42,71 @@ record Product(String name, String sku, int quantity, double price) {
 
 void main() {
     var scanner = new Scanner(System.in);
+    Product[] products = null;
 
-    System.out.println("--- Warehouse accounting system ---");
-    System.out.print("Enter the number of products to add to the array: ");
-    int n = scanner.nextInt();
-    scanner.nextLine();
-
-    var products = new Product[n];
-
-    for (int i = 0; i < n; i++) {
-        System.out.println("\nEntering data for product #" + (i + 1));
-        System.out.print("Name: ");
-        var name = scanner.nextLine();
-
-        System.out.print("SKU: ");
-        var sku = scanner.nextLine();
-
-        System.out.print("Quantity: ");
-        int quantity = scanner.nextInt();
-
-        System.out.print("Price: ");
-        double price = scanner.nextDouble();
+    try {
+        System.out.println("--- Warehouse accounting system ---");
+        System.out.print("Enter the number of products to add: ");
+        int n = scanner.nextInt();
         scanner.nextLine();
 
-        products[i] = new Product(name, sku, quantity, price);
-    }
+        products = new Product[n];
 
-    System.out.println("\n--- List of products in stock ---");
-    for (var product : products) {
-        System.out.println(product);
-    }
+        for (int i = 0; i < n; i++) {
+            System.out.println("\nEntering data for product #" + (i + 1));
+            System.out.print("Name: ");
+            var name = scanner.nextLine();
+            
+            System.out.print("SKU: ");
+            var sku = scanner.nextLine();
+            
+            System.out.print("Quantity: ");
+            int quantity = scanner.nextInt();
+            
+            System.out.print("Price: ");
+            double price = scanner.nextDouble();
+            scanner.nextLine();
 
-    double thresholdPrice = 1000.0;
-    int expensiveCount = 0;
-    for (var product : products) {
-        if (product.price() > thresholdPrice) {
-            expensiveCount++;
+            products[i] = createProduct(name, sku, quantity, price);
         }
-    }
-    System.out.println("\nNumber of products more expensive than " + thresholdPrice + ": " + expensiveCount);
 
-    System.out.println("\n--- Sorting products by price in ascending order ---");
-    bubbleSort(products);
-    for (var product : products) {
-        System.out.println(product);
-    }
+        System.out.print("\nEnter product index to view details: ");
+        int indexToView = scanner.nextInt();
+        System.out.println(products[indexToView]);
 
-    System.out.println("\n--- Searching for a reference product ---");
-    var targetProduct = new Product("Laptop", "SKU123", 5, 25000.0);
-    System.out.println("Searching for: " + targetProduct);
-
-    int foundIndex = linearSearch(products, targetProduct);
-    if (foundIndex != -1) {
-        System.out.println("Product found in the array at index: " + foundIndex);
-    } else {
-        System.out.println("Product with exact characteristics not found.");
-    }
-
-    scanner.close();
-}
-
-void bubbleSort(Product[] arr) {
-    int n = arr.length;
-    for (int i = 0; i < n - 1; i++) {
-        for (int j = 0; j < n - i - 1; j++) {
-            if (arr[j].price() > arr[j + 1].price()) {
-                 var temp = arr[j];
-                 arr[j] = arr[j + 1];
-                 arr[j + 1] = temp;
-            }
+    } catch (InputMismatchException e) {
+        System.out.println("Input error: Please enter valid numbers for quantity, price, and array sizes.");
+    } catch (ArrayIndexOutOfBoundsException e) {
+        System.out.println("Index error: The index you entered is outside the valid range of the array.");
+    } catch (WarehouseException e) {
+        System.out.println("Domain error: " + e.getMessage());
+        if (e instanceof InvalidPriceException ipe) {
+            System.out.println("Rejected price value: " + ipe.getInvalidPrice());
+        } else if (e instanceof InvalidQuantityException iqe) {
+            System.out.println("Rejected quantity value: " + iqe.getInvalidQuantity());
         }
+    } finally {
+        System.out.println("\nExecuting final cleanup...");
+        scanner.close();
+        System.out.println("Scanner closed. Warehouse system shutdown.");
     }
 }
 
-int linearSearch(Product[] arr, Product target) {
-    for (int i = 0; i < arr.length; i++) {
-        if (arr[i].equals(target)) {
-            return i;
-        }
+Product createProduct(String name, String sku, int quantity, double price) throws WarehouseException {
+    try {
+        validateProductData(quantity, price);
+        return new Product(name, sku, quantity, price);
+    } catch (WarehouseException e) {
+        System.out.println("[SYSTEM LOG]: Attempted to create an invalid product (" + name + ").");
+        throw e;
     }
-    return -1;
+}
+
+void validateProductData(int quantity, double price) throws WarehouseException {
+    if (price < 0) {
+        throw new InvalidPriceException("Price cannot be negative.", price);
+    }
+    if (quantity < 0) {
+        throw new InvalidQuantityException("Quantity cannot be negative.", quantity);
+    }
 }

@@ -20,6 +20,19 @@ The program allows you to:
 4. Sort the array of objects by price using the **Bubble Sort** algorithm.
 5. Perform a linear search for a specific reference object in the array using the overridden `equals()` method.
 
+
+# Lab 3: Exception Handling and Custom Exceptions
+
+**Domain:** Warehouse accounting
+
+## Description
+This project implements robust exception handling for a warehouse accounting application. It demonstrates the use of standard and custom exceptions to validate domain rules and handle unexpected runtime errors.
+
+**Key Features:**
+1. **Standard Exception Handling:** Uses `try-catch-finally` to safely handle `InputMismatchException` (invalid user input types) and `ArrayIndexOutOfBoundsException` (accessing invalid product indices).
+2. **Custom Exception Hierarchy:** Implements a base `WarehouseException` (checked exception) with two subclasses: `InvalidPriceException` and `InvalidQuantityException`. Each custom exception carries additional context (the rejected value).
+3. **Advanced Flow Control:** Demonstrates multiple `catch` blocks ordered from specific to general, exception re-throwing (logging errors before passing them up the call stack), and guaranteed resource cleanup using the `finally` block to close the `Scanner`.
+
 ## How to launch:
 Download file from github
 
