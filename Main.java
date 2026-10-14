@@ -1,21 +1,51 @@
 import java.util.Arrays;
+import java.util.InputMismatchException;
+import java.util.Scanner;
 
-// Рівень 1: Інтерфейс, що описує варіативну поведінку (Strategy)
+abstract class WarehouseException extends Exception {
+    public WarehouseException(String message) {
+        super(message);
+    }
+}
+
+class InvalidPriceException extends WarehouseException {
+    private final double invalidPrice;
+
+    public InvalidPriceException(String message, double invalidPrice) {
+        super(message);
+        this.invalidPrice = invalidPrice;
+    }
+
+    public double getInvalidPrice() {
+        return invalidPrice;
+    }
+}
+
+class InvalidQuantityException extends WarehouseException {
+    private final int invalidQuantity;
+
+    public InvalidQuantityException(String message, int invalidQuantity) {
+        super(message);
+        this.invalidQuantity = invalidQuantity;
+    }
+
+    public int getInvalidQuantity() {
+        return invalidQuantity;
+    }
+}
+
 interface PricingStrategy {
     double calculatePrice(double basePrice, int quantity);
     
-    // Рівень 2: Default-метод в інтерфейсі
     default String getStrategyName() {
         return "Unknown Pricing Strategy";
     }
 }
 
-// Рівень 2: Додатковий інтерфейс для демонстрації множинної реалізації
 interface Reportable {
     void printReport();
 }
 
-// Рівень 2: Абстрактний клас, що частково реалізує інтерфейс
 abstract class DiscountPricingStrategy implements PricingStrategy {
     protected double discountPercentage;
 
@@ -23,13 +53,11 @@ abstract class DiscountPricingStrategy implements PricingStrategy {
         this.discountPercentage = discountPercentage;
     }
 
-    // Спільна логіка застосування знижки, щоб не дублювати її в підкласах
     protected double applyDiscount(double totalAmount) {
         return totalAmount - (totalAmount * (discountPercentage / 100.0));
     }
 }
 
-// Рівень 1 & 3: Конкретна реалізація №1 (Без знижки)
 class RegularPriceStrategy implements PricingStrategy {
     @Override
     public double calculatePrice(double basePrice, int quantity) {
@@ -42,7 +70,6 @@ class RegularPriceStrategy implements PricingStrategy {
     }
 }
 
-// Рівень 1 & 3: Конкретна реалізація №2 (Оптова знижка)
 class BulkDiscountStrategy extends DiscountPricingStrategy {
     private final int minimumQuantity;
 
@@ -66,35 +93,16 @@ class BulkDiscountStrategy extends DiscountPricingStrategy {
     }
 }
 
-// Рівень 1 & 3: Конкретна реалізація №3 (Сезонна знижка на все)
-class SeasonalDiscountStrategy extends DiscountPricingStrategy {
-    public SeasonalDiscountStrategy(double discountPercentage) {
-        super(discountPercentage);
-    }
-
-    @Override
-    public double calculatePrice(double basePrice, int quantity) {
-        return applyDiscount(basePrice * quantity);
-    }
-
-    @Override
-    public String getStrategyName() {
-        return "Seasonal Discount (" + discountPercentage + "% off everything)";
-    }
-}
-
-// Рівень 3: Контекстний клас (Strategy Pattern)
-// Рівень 2: Множинна імплементація інтерфейсів (Reportable та Comparable)
 class Product implements Reportable, Comparable<Product> {
     private String name;
     private String sku;
     private int quantity;
     private double price;
-    
-    // Делегування поведінки через інтерфейс
     private PricingStrategy pricingStrategy;
 
-    public Product(String name, String sku, int quantity, double price, PricingStrategy pricingStrategy) {
+    // Конструктор тепер перевіряє дані і може кинути виняток (ЛР №3)
+    public Product(String name, String sku, int quantity, double price, PricingStrategy pricingStrategy) throws WarehouseException {
+        validateData(quantity, price);
         this.name = name;
         this.sku = sku;
         this.quantity = quantity;
@@ -102,7 +110,17 @@ class Product implements Reportable, Comparable<Product> {
         this.pricingStrategy = pricingStrategy;
     }
 
-    // Дозволяє змінювати стратегію під час виконання (Runtime)
+    // ЛР №3: Валідація даних
+    private void validateData(int quantity, double price) throws WarehouseException {
+        if (price < 0) {
+            throw new InvalidPriceException("Price cannot be negative.", price);
+        }
+        if (quantity < 0) {
+            throw new InvalidQuantityException("Quantity cannot be negative.", quantity);
+        }
+    }
+
+    // ЛР №4: Зміна стратегії в Runtime
     public void setPricingStrategy(PricingStrategy pricingStrategy) {
         this.pricingStrategy = pricingStrategy;
     }
@@ -117,7 +135,6 @@ class Product implements Reportable, Comparable<Product> {
                 name, sku, quantity, price, getFinalPrice(), pricingStrategy.getStrategyName());
     }
 
-    // Окрема поведінка сортування (порівняння за фінальною ціною)
     @Override
     public int compareTo(Product other) {
         return Double.compare(this.getFinalPrice(), other.getFinalPrice());
@@ -125,38 +142,54 @@ class Product implements Reportable, Comparable<Product> {
 }
 
 void main() {
-    System.out.println("--- Warehouse Pricing System (Strategy Pattern) ---\n");
-
-    // Створення об'єктів з різними початковими стратегіями
-    var laptop = new Product("Laptop", "SKU101", 1, 1000.0, new RegularPriceStrategy());
-    var mouse = new Product("Mouse", "SKU102", 50, 20.0, new BulkDiscountStrategy(15.0, 20));
-    var keyboard = new Product("Keyboard", "SKU103", 5, 50.0, new SeasonalDiscountStrategy(10.0));
-
-    Product[] inventory = { laptop, mouse, keyboard };
-
-    // Рівень 1: Поліморфне використання в циклі
-    System.out.println("Initial State:");
-    for (var product : inventory) {
-        product.printReport();
-    }
-
-    // Рівень 2: Демонстрація сортування (Comparable)
-    System.out.println("\nSorted by Final Cost:");
-    Arrays.sort(inventory);
-    for (var product : inventory) {
-        product.printReport();
-    }
-
-    // Рівень 3: Зміна стратегії під час виконання (Runtime)
-    System.out.println("\n--- Black Friday Event! Changing strategies dynamically ---");
+    var scanner = new Scanner(System.in);
     
-    // Змінюємо стратегію для ноутбука без створення нового об'єкта Product
-    laptop.setPricingStrategy(new SeasonalDiscountStrategy(25.0));
-    
-    // Змінюємо стратегію для мишок на ще більшу оптову знижку
-    mouse.setPricingStrategy(new BulkDiscountStrategy(30.0, 10));
+    // ЛР №3: Обробка винятків через try-catch-finally
+    try {
+        System.out.println("--- Warehouse System (Labs 3 & 4) ---\n");
+        
+        // Створюємо товари. Навмисно створюємо один з некоректною ціною для перевірки винятків
+        System.out.println("Attempting to create products...");
+        
+        var validProduct1 = new Product("Laptop", "SKU101", 1, 1000.0, new RegularPriceStrategy());
+        var validProduct2 = new Product("Mouse", "SKU102", 50, 20.0, new BulkDiscountStrategy(15.0, 20));
+        
+        Product[] inventory = { validProduct1, validProduct2 };
+        
+        // ЛР №4: Поліморфізм та сортування
+        System.out.println("\n--- Inventory (Sorted by Final Cost) ---");
+        Arrays.sort(inventory);
+        for (var product : inventory) {
+            product.printReport();
+        }
+        
+        // ЛР №4: Зміна поведінки (Strategy) в Runtime
+        System.out.println("\n--- Black Friday! Changing strategy for Laptop ---");
+        validProduct1.setPricingStrategy(new BulkDiscountStrategy(25.0, 1));
+        validProduct1.printReport();
 
-    for (var product : inventory) {
-        product.printReport();
+        // Спровокуємо помилку для ЛР №3
+        System.out.println("\n--- Testing Exception Handling ---");
+        System.out.print("Enter price for a test product: ");
+        double testPrice = scanner.nextDouble(); // Введіть від'ємне число, щоб побачити помилку
+        
+        // Це кине виняток, якщо ціна < 0
+        var invalidProduct = new Product("ErrorItem", "SKU000", 10, testPrice, new RegularPriceStrategy());
+        System.out.println("Product created successfully (This won't print if price is negative).");
+
+    } catch (InputMismatchException e) {
+        System.out.println("INPUT ERROR: Please enter a valid number.");
+    } catch (WarehouseException e) {
+        // ЛР №3: Множинна обробка доменних помилок
+        System.out.println("DOMAIN ERROR: " + e.getMessage());
+        if (e instanceof InvalidPriceException ipe) {
+            System.out.println("Rejected price value: " + ipe.getInvalidPrice());
+        } else if (e instanceof InvalidQuantityException iqe) {
+            System.out.println("Rejected quantity value: " + iqe.getInvalidQuantity());
+        }
+    } finally {
+        System.out.println("\nExecuting final cleanup...");
+        scanner.close();
+        System.out.println("Scanner closed.");
     }
 }
