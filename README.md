@@ -46,6 +46,17 @@ This project demonstrates advanced Object-Oriented Programming principles in Jav
 4. **Multiple Interfaces:** The `Product` class implements both `Reportable` (business behavior) and `Comparable` (sorting behavior) simultaneously.
 5. **Strategy Pattern:** The `Product` context class accepts a `PricingStrategy` via its constructor and a setter. This allows the system to change pricing rules (e.g., applying a Black Friday discount) dynamically at runtime without recreating the objects.
 
+## Lab 5: Code Refactoring with Design Patterns (GoF)
+
+**Domain:** Warehouse accounting  
+**Description:**  
+This project focuses on refactoring the existing codebase by incorporating Gang of Four (GoF) design patterns—Factory Method, Observer, and Adapter. The refactoring addresses real architectural issues, improving code maintainability, extensibility, and loose coupling without modifying core domain logic.
+
+**Key Features:**
+1. **Factory Method Pattern (Creational):** Encapsulates the instantiation logic of pricing strategies inside a `PricingStrategyFactory`. Replaces direct `new` calls and conditional creation logic in client code, strictly adhering to the Open/Closed Principle (OCP).
+2. **Observer Pattern (Behavioral):** Decouples inventory state changes from notification mechanisms. The `Product` class acts as a subject (`InventorySubject`) that notifies registered `StockObserver` implementations (such as `AuditLogger` for activity tracking and `LowStockNotifier` for inventory threshold alerts) whenever product quantities change.
+3. **Adapter Pattern (Structural):** Integrates an incompatible legacy third-party API (`ExternalSupplierApi`) into the existing domain infrastructure. The `LegacySupplierAdapter` converts wholesale cost calculations (provided in cents) to match the internal `PricingStrategy` interface without altering the external library's source code.
+
 ## How to launch:
 Download file from github
 

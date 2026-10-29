@@ -1,5 +1,7 @@
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.InputMismatchException;
+import java.util.List;
 import java.util.Scanner;
 
 abstract class WarehouseException extends Exception {
@@ -36,7 +38,7 @@ class InvalidQuantityException extends WarehouseException {
 
 interface PricingStrategy {
     double calculatePrice(double basePrice, int quantity);
-    
+
     default String getStrategyName() {
         return "Unknown Pricing Strategy";
     }
@@ -58,7 +60,7 @@ abstract class DiscountPricingStrategy implements PricingStrategy {
     }
 }
 
-class RegularPriceStrategy implements PricingStrategy {
+public static class RegularPriceStrategy implements PricingStrategy {
     @Override
     public double calculatePrice(double basePrice, int quantity) {
         return basePrice * quantity;
@@ -70,7 +72,7 @@ class RegularPriceStrategy implements PricingStrategy {
     }
 }
 
-class BulkDiscountStrategy extends DiscountPricingStrategy {
+public static class BulkDiscountStrategy extends DiscountPricingStrategy {
     private final int minimumQuantity;
 
     public BulkDiscountStrategy(double discountPercentage, int minimumQuantity) {
@@ -93,14 +95,111 @@ class BulkDiscountStrategy extends DiscountPricingStrategy {
     }
 }
 
-class Product implements Reportable, Comparable<Product> {
-    private String name;
-    private String sku;
+enum StrategyType {
+    REGULAR,
+    BULK_DISCOUNT
+}
+
+class PricingStrategyFactory {
+    public static PricingStrategy createStrategy(StrategyType type, double discountPercentage, int minQuantity) {
+        return switch (type) {
+            case REGULAR -> new RegularPriceStrategy();
+            case BULK_DISCOUNT -> new BulkDiscountStrategy(discountPercentage, minQuantity);
+        };
+    }
+
+    public static PricingStrategy createStrategy(StrategyType type) {
+        return createStrategy(type, 0.0, 0);
+    }
+}
+
+interface StockObserver {
+    void onStockChanged(String productName, String sku, int oldQty, int newQty);
+}
+
+class AuditLogger implements StockObserver {
+    @Override
+    public void onStockChanged(String productName, String sku, int oldQty, int newQty) {
+        System.out.printf("[AUDIT LOG] Product '%s' (%s) quantity changed from %d to %d.%n", productName, sku, oldQty, newQty);
+    }
+}
+
+class LowStockNotifier implements StockObserver {
+    private final int threshold;
+
+    public LowStockNotifier(int threshold) {
+        this.threshold = threshold;
+    }
+
+    @Override
+    public void onStockChanged(String productName, String sku, int oldQty, int newQty) {
+        if (newQty < threshold) {
+            System.out.printf("[WARNING ALERT] Low Stock! Product '%s' (%s) is down to %d items (Threshold: %d)!%n",
+                    productName, sku, newQty, threshold);
+        }
+    }
+}
+
+// Subject (Суб'єкт)
+class InventorySubject {
+    private final List<StockObserver> observers = new ArrayList<>();
+
+    public void attach(StockObserver observer) {
+        observers.add(observer);
+    }
+
+    public void detach(StockObserver observer) {
+        observers.remove(observer);
+    }
+
+    protected void notifyObservers(String productName, String sku, int oldQty, int newQty) {
+        for (StockObserver observer : observers) {
+            try {
+                observer.onStockChanged(productName, sku, oldQty, newQty);
+            } catch (Exception e) {
+                System.err.println("Error notifying observer: " + e.getMessage());
+            }
+        }
+    }
+}
+
+class ExternalSupplierApi {
+    public double fetchCostInCents(int itemsCount, double itemPriceUSD) {
+        double totalUsd = itemsCount * itemPriceUSD * 0.95;
+        return totalUsd * 100.0;
+    }
+
+    public String getVendorName() {
+        return "Global Wholesaler Corp.";
+    }
+}
+
+class LegacySupplierAdapter implements PricingStrategy {
+    private final ExternalSupplierApi externalApi;
+
+    public LegacySupplierAdapter(ExternalSupplierApi externalApi) {
+        this.externalApi = externalApi;
+    }
+
+    @Override
+    public double calculatePrice(double basePrice, int quantity) {
+        double costInCents = externalApi.fetchCostInCents(quantity, basePrice);
+        return costInCents / 100.0;
+    }
+
+    @Override
+    public String getStrategyName() {
+        return "Adapter -> Vendor: " + externalApi.getVendorName() + " (5% Wholesale Integration)";
+    }
+}
+
+class Product extends InventorySubject implements Reportable, Comparable<Product> {
+    private final String name;
+    private final String sku;
+    private final double price;
     private int quantity;
-    private double price;
     private PricingStrategy pricingStrategy;
 
-    // Конструктор тепер перевіряє дані і може кинути виняток (ЛР №3)
     public Product(String name, String sku, int quantity, double price, PricingStrategy pricingStrategy) throws WarehouseException {
         validateData(quantity, price);
         this.name = name;
@@ -110,7 +209,6 @@ class Product implements Reportable, Comparable<Product> {
         this.pricingStrategy = pricingStrategy;
     }
 
-    // ЛР №3: Валідація даних
     private void validateData(int quantity, double price) throws WarehouseException {
         if (price < 0) {
             throw new InvalidPriceException("Price cannot be negative.", price);
@@ -120,7 +218,15 @@ class Product implements Reportable, Comparable<Product> {
         }
     }
 
-    // ЛР №4: Зміна стратегії в Runtime
+    public void setQuantity(int newQuantity) throws WarehouseException {
+        if (newQuantity < 0) {
+            throw new InvalidQuantityException("Quantity cannot be negative.", newQuantity);
+        }
+        int oldQuantity = this.quantity;
+        this.quantity = newQuantity;
+        notifyObservers(name, sku, oldQuantity, newQuantity);
+    }
+
     public void setPricingStrategy(PricingStrategy pricingStrategy) {
         this.pricingStrategy = pricingStrategy;
     }
@@ -143,49 +249,64 @@ class Product implements Reportable, Comparable<Product> {
 
 void main() {
     var scanner = new Scanner(System.in);
-    
-    // ЛР №3: Обробка винятків через try-catch-finally
+
     try {
-        System.out.println("--- Warehouse System (Labs 3 & 4) ---\n");
-        
-        // Створюємо товари. Навмисно створюємо один з некоректною ціною для перевірки винятків
-        System.out.println("Attempting to create products...");
-        
-        var validProduct1 = new Product("Laptop", "SKU101", 1, 1000.0, new RegularPriceStrategy());
-        var validProduct2 = new Product("Mouse", "SKU102", 50, 20.0, new BulkDiscountStrategy(15.0, 20));
-        
-        Product[] inventory = { validProduct1, validProduct2 };
-        
-        // ЛР №4: Поліморфізм та сортування
-        System.out.println("\n--- Inventory (Sorted by Final Cost) ---");
+        System.out.println("=== Warehouse Management System (Java 25) ===\n");
+
+        // 1. Factory Method
+        System.out.println("--- 1. Factory Method Demonstration ---");
+        PricingStrategy regularFactoryStrategy = PricingStrategyFactory.createStrategy(StrategyType.REGULAR);
+        PricingStrategy bulkFactoryStrategy = PricingStrategyFactory.createStrategy(StrategyType.BULK_DISCOUNT, 15.0, 20);
+
+        Product laptop = new Product("Laptop", "SKU101", 10, 1000.0, regularFactoryStrategy);
+        Product mouse = new Product("Mouse", "SKU102", 50, 20.0, bulkFactoryStrategy);
+
+        // 2. Adapter
+        System.out.println("\n--- 2. Adapter Pattern Demonstration ---");
+        ExternalSupplierApi legacyApi = new ExternalSupplierApi();
+        PricingStrategy adapterStrategy = new LegacySupplierAdapter(legacyApi);
+        Product keyboard = new Product("Keyboard", "SKU103", 15, 40.0, adapterStrategy);
+
+        Product[] inventory = { laptop, mouse, keyboard };
+
+        System.out.println("\n--- Current Inventory ---");
         Arrays.sort(inventory);
         for (var product : inventory) {
             product.printReport();
         }
-        
-        // ЛР №4: Зміна поведінки (Strategy) в Runtime
-        System.out.println("\n--- Black Friday! Changing strategy for Laptop ---");
-        validProduct1.setPricingStrategy(new BulkDiscountStrategy(25.0, 1));
-        validProduct1.printReport();
 
-        // Спровокуємо помилку для ЛР №3
-        System.out.println("\n--- Testing Exception Handling ---");
-        System.out.print("Enter price for a test product: ");
-        double testPrice = scanner.nextDouble(); // Введіть від'ємне число, щоб побачити помилку
-        
-        // Це кине виняток, якщо ціна < 0
-        var invalidProduct = new Product("ErrorItem", "SKU000", 10, testPrice, new RegularPriceStrategy());
-        System.out.println("Product created successfully (This won't print if price is negative).");
+        // 3. Observer
+        System.out.println("\n--- 3. Observer Pattern Demonstration ---");
+        StockObserver auditLogger = new AuditLogger();
+        StockObserver lowStockNotifier = new LowStockNotifier(5);
+
+        laptop.attach(auditLogger);
+        laptop.attach(lowStockNotifier);
+
+        System.out.println("Updating Laptop quantity from 10 to 8...");
+        laptop.setQuantity(8);
+
+        System.out.println("\nUpdating Laptop quantity from 8 to 3 (Triggers Low Stock Alert)...");
+        laptop.setQuantity(3);
+
+        // 4. Exception Handling
+        System.out.println("\n--- 4. Exception Handling Check ---");
+        System.out.print("Enter test price for a new product: ");
+        double testPrice = scanner.nextDouble();
+
+        Product testProduct = new Product("ErrorItem", "SKU000", 10, testPrice, regularFactoryStrategy);
+        System.out.println("Product successfully created: " + testProduct.getFinalPrice());
 
     } catch (InputMismatchException e) {
         System.out.println("INPUT ERROR: Please enter a valid number.");
     } catch (WarehouseException e) {
-        // ЛР №3: Множинна обробка доменних помилок
         System.out.println("DOMAIN ERROR: " + e.getMessage());
-        if (e instanceof InvalidPriceException ipe) {
-            System.out.println("Rejected price value: " + ipe.getInvalidPrice());
-        } else if (e instanceof InvalidQuantityException iqe) {
-            System.out.println("Rejected quantity value: " + iqe.getInvalidQuantity());
+        switch (e) {
+            case InvalidPriceException ipe ->
+                System.out.println("Rejected price value: " + ipe.getInvalidPrice());
+            case InvalidQuantityException iqe ->
+                System.out.println("Rejected quantity value: " + iqe.getInvalidQuantity());
+            default -> {}
         }
     } finally {
         System.out.println("\nExecuting final cleanup...");
