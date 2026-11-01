@@ -1,14 +1,72 @@
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.InputMismatchException;
-import java.util.List;
-import java.util.Objects;
-import java.util.Scanner;
+import java.util.*;
 
 public class Main {
 
-    // ==================== 1. Винятки (Exceptions) ====================
+    // ==================== 0. Base Entity & Lab 7-9 Exceptions ====================
+
+    /**
+     * BaseEntity class (Lab 6 / Lab 7-9).
+     * Contains immutable 'id' and mutable 'name'.
+     */
+    public static abstract class BaseEntity {
+        private final long id;
+        private String name;
+
+        public BaseEntity(long id, String name) {
+            this.id = id;
+            this.name = Objects.requireNonNull(name, "Name cannot be null");
+        }
+
+        public long getId() {
+            return id;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = Objects.requireNonNull(name, "Name cannot be null");
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            BaseEntity that = (BaseEntity) o;
+            return id == that.id;
+        }
+
+        @Override
+        public int hashCode() {
+            return Long.hashCode(id);
+        }
+
+        @Override
+        public String toString() {
+            return String.format("Entity{id=%d, name='%s'}", id, name);
+        }
+    }
+
+    /**
+     * Custom Unchecked Exception for missing entities (Lab 7-9, Level 1).
+     */
+    public static class EntityNotFoundException extends RuntimeException {
+        private final long id;
+
+        public EntityNotFoundException(long id) {
+            super("Entity with id=" + id + " was not found in storage.");
+            this.id = id;
+        }
+
+        public long getId() {
+            return id;
+        }
+    }
+
+    // ==================== 1. Domain Exceptions (Your Code) ====================
+
     public static abstract class WarehouseException extends Exception {
         public WarehouseException(String message) {
             super(message);
@@ -41,7 +99,8 @@ public class Main {
         }
     }
 
-    // ==================== 2. Інтерфейси та Стратегії ====================
+    // ==================== 2. Interfaces & Strategies (Your Code) ====================
+
     public interface PricingStrategy {
         double calculatePrice(double basePrice, int quantity);
 
@@ -119,7 +178,8 @@ public class Main {
         }
     }
 
-    // ==================== 3. Патерн Спостерігач (Observer) ====================
+    // ==================== 3. Observer Pattern (Your Code) ====================
+
     public interface StockObserver {
         void onStockChanged(String productName, String sku, int oldQty, int newQty);
     }
@@ -169,7 +229,8 @@ public class Main {
         }
     }
 
-    // ==================== 4. Патерн Адаптер (Adapter) ====================
+    // ==================== 4. Adapter Pattern (Your Code) ====================
+
     public static class ExternalSupplierApi {
         public double fetchCostInCents(int itemsCount, double itemPriceUSD) {
             double totalUsd = itemsCount * itemPriceUSD * 0.95;
@@ -200,21 +261,22 @@ public class Main {
         }
     }
 
-    // ==================== 5. Ієрархія сутностей (Sealed & Static) ====================
+    // ==================== 5. Entity Hierarchy (Your Code + BaseEntity) ====================
 
-    public static abstract sealed class WarehouseItem implements Reportable, Comparable<WarehouseItem> permits PhysicalProduct {
-        private final String name;
+    /**
+     * WarehouseItem now extends BaseEntity to fulfill Lab 7-9 requirements.
+     */
+    public static abstract sealed class WarehouseItem extends BaseEntity implements Reportable, Comparable<WarehouseItem> permits PhysicalProduct {
         private final String sku;
-        private final double price;
+        private double price;
         private int quantity;
 
         private final InventorySubject inventorySubject = new InventorySubject();
         private PricingStrategy pricingStrategy;
 
-        public WarehouseItem(String name, String sku, int quantity, double price, PricingStrategy pricingStrategy) throws WarehouseException {
-            System.out.println("  [Constructor WarehouseItem] Initializing base warehouse item...");
+        public WarehouseItem(long id, String name, String sku, int quantity, double price, PricingStrategy pricingStrategy) throws WarehouseException {
+            super(id, name);
             validateData(quantity, price);
-            this.name = name;
             this.sku = sku;
             this.quantity = quantity;
             this.price = price;
@@ -230,7 +292,6 @@ public class Main {
             }
         }
 
-        public String getName() { return name; }
         public String getSku() { return sku; }
         public double getPrice() { return price; }
         public int getQuantity() { return quantity; }
@@ -242,7 +303,7 @@ public class Main {
             }
             int oldQuantity = this.quantity;
             this.quantity = newQuantity;
-            inventorySubject.notifyObservers(name, sku, oldQuantity, newQuantity);
+            inventorySubject.notifyObservers(getName(), sku, oldQuantity, newQuantity);
         }
 
         public void attachObserver(StockObserver observer) {
@@ -261,47 +322,43 @@ public class Main {
 
         @Override
         public void printReport() {
-            System.out.printf("[%s] Item: %-10s (SKU: %s) | Qty: %d | Base Price: %.2f | Final Cost: %.2f | Strategy: %s",
-                    getItemCategory(), name, sku, quantity, price, getFinalPrice(), pricingStrategy.getStrategyName());
+            System.out.printf("[%s] ID: %d | Item: %-10s (SKU: %s) | Qty: %d | Base Price: %.2f | Final Cost: %.2f | Strategy: %s",
+                    getItemCategory(), getId(), getName(), sku, quantity, price, getFinalPrice(), pricingStrategy.getStrategyName());
         }
 
+        /**
+         * Natural ordering (Comparable) by Name (case-insensitive).
+         */
         @Override
         public int compareTo(WarehouseItem other) {
-            return Double.compare(this.getFinalPrice(), other.getFinalPrice());
+            return this.getName().compareToIgnoreCase(other.getName());
         }
 
         @Override
         public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            WarehouseItem that = (WarehouseItem) o;
-            return Double.compare(that.price, price) == 0 &&
-                    quantity == that.quantity &&
-                    Objects.equals(name, that.name) &&
-                    Objects.equals(sku, that.sku);
+            return super.equals(o); // Equals defined by ID in BaseEntity
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(name, sku, price, quantity);
+            return super.hashCode();
         }
 
         @Override
         public String toString() {
-            return String.format("WarehouseItem{name='%s', sku='%s', price=%.2f, quantity=%d}", name, sku, price, quantity);
+            return String.format("WarehouseItem{id=%d, name='%s', sku='%s', price=%.2f, quantity=%d}", getId(), getName(), sku, price, quantity);
         }
     }
 
     public static abstract sealed class PhysicalProduct extends WarehouseItem permits PerishableProduct, ElectronicsProduct {
         private final double weightKg;
 
-        public PhysicalProduct(String name, String sku, int quantity, double price, PricingStrategy pricingStrategy) throws WarehouseException {
-            this(name, sku, quantity, price, pricingStrategy, 1.0);
+        public PhysicalProduct(long id, String name, String sku, int quantity, double price, PricingStrategy pricingStrategy) throws WarehouseException {
+            this(id, name, sku, quantity, price, pricingStrategy, 1.0);
         }
 
-        public PhysicalProduct(String name, String sku, int quantity, double price, PricingStrategy pricingStrategy, double weightKg) throws WarehouseException {
-            super(name, sku, quantity, price, pricingStrategy);
-            System.out.println("  [Constructor PhysicalProduct] Initializing physical product attributes...");
+        public PhysicalProduct(long id, String name, String sku, int quantity, double price, PricingStrategy pricingStrategy, double weightKg) throws WarehouseException {
+            super(id, name, sku, quantity, price, pricingStrategy);
             this.weightKg = weightKg;
         }
 
@@ -313,28 +370,13 @@ public class Main {
         public String toString() {
             return super.toString() + String.format(" [PhysicalProduct{weight=%.2fkg}]", weightKg);
         }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            if (!super.equals(o)) return false;
-            PhysicalProduct that = (PhysicalProduct) o;
-            return Double.compare(that.weightKg, weightKg) == 0;
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(super.hashCode(), weightKg);
-        }
     }
 
     public static final class PerishableProduct extends PhysicalProduct {
         private final LocalDate expirationDate;
 
-        public PerishableProduct(String name, String sku, int quantity, double price, PricingStrategy pricingStrategy, double weightKg, LocalDate expirationDate) throws WarehouseException {
-            super(name, sku, quantity, price, pricingStrategy, weightKg);
-            System.out.println("  [Constructor PerishableProduct] Initializing perishable product attributes...");
+        public PerishableProduct(long id, String name, String sku, int quantity, double price, PricingStrategy pricingStrategy, double weightKg, LocalDate expirationDate) throws WarehouseException {
+            super(id, name, sku, quantity, price, pricingStrategy, weightKg);
             this.expirationDate = expirationDate;
         }
 
@@ -352,28 +394,13 @@ public class Main {
             super.printReport();
             System.out.printf(" | Exp Date: %s%n", expirationDate);
         }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            if (!super.equals(o)) return false;
-            PerishableProduct that = (PerishableProduct) o;
-            return Objects.equals(expirationDate, that.expirationDate);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(super.hashCode(), expirationDate);
-        }
     }
 
     public static final class ElectronicsProduct extends PhysicalProduct {
         private final int warrantyMonths;
 
-        public ElectronicsProduct(String name, String sku, int quantity, double price, PricingStrategy pricingStrategy, double weightKg, int warrantyMonths) throws WarehouseException {
-            super(name, sku, quantity, price, pricingStrategy, weightKg);
-            System.out.println("  [Constructor ElectronicsProduct] Initializing electronics attributes...");
+        public ElectronicsProduct(long id, String name, String sku, int quantity, double price, PricingStrategy pricingStrategy, double weightKg, int warrantyMonths) throws WarehouseException {
+            super(id, name, sku, quantity, price, pricingStrategy, weightKg);
             this.warrantyMonths = warrantyMonths;
         }
 
@@ -395,20 +422,115 @@ public class Main {
             super.printReport();
             System.out.printf(" | Warranty: %d months%n", warrantyMonths);
         }
+    }
+
+    // ==================== 6. Generic CRUD Service Architecture (Lab 7-9) ====================
+
+    /**
+     * Generic CRUD Service Interface.
+     * Level 1 & Level 3.
+     */
+    public interface CRUDService<T extends BaseEntity> {
+        Optional<T> findById(long id);
+
+        T save(T entity);
+
+        boolean delete(long id);
+
+        List<T> findAll();
+
+        /**
+         * Generic sort method accepting wildcards: Comparator<? super T>.
+         * Level 3.
+         */
+        List<T> findAllSorted(Comparator<? super T> comparator);
+
+        /**
+         * Default method sorting by name using natural order or comparator.
+         * Level 3.
+         */
+        default List<T> findAllSortedByName() {
+            return findAllSorted(Comparator.comparing(BaseEntity::getName, String.CASE_INSENSITIVE_ORDER));
+        }
+    }
+
+    /**
+     * Entity-specific interface extending CRUDService.
+     * Level 2.
+     */
+    public interface WarehouseItemService<T extends WarehouseItem> extends CRUDService<T> {
+        List<T> findAllSortedByNameAndByPrice();
+    }
+
+    /**
+     * In-Memory CRUD implementation using LinkedHashMap.
+     * Level 1, 2, 3.
+     */
+    public static class InMemoryCrudService<T extends BaseEntity> implements CRUDService<T> {
+        protected final Map<Long, T> storage = new LinkedHashMap<>();
 
         @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            if (!super.equals(o)) return false;
-            ElectronicsProduct that = (ElectronicsProduct) o;
-            return warrantyMonths == that.warrantyMonths;
+        public Optional<T> findById(long id) {
+            return Optional.ofNullable(storage.get(id));
         }
 
         @Override
-        public int hashCode() {
-            return Objects.hash(super.hashCode(), warrantyMonths);
+        public T save(T entity) {
+            Objects.requireNonNull(entity, "Entity cannot be null");
+            storage.put(entity.getId(), entity);
+            return entity;
         }
+
+        @Override
+        public boolean delete(long id) {
+            return storage.remove(id) != null;
+        }
+
+        @Override
+        public List<T> findAll() {
+            return new ArrayList<>(storage.values());
+        }
+
+        @Override
+        public List<T> findAllSorted(Comparator<? super T> comparator) {
+            Objects.requireNonNull(comparator, "Comparator cannot be null");
+            List<T> sortedList = new ArrayList<>(storage.values());
+            sortedList.sort(comparator);
+            return sortedList;
+        }
+    }
+
+    /**
+     * Concrete implementation for WarehouseItem.
+     * Level 2.
+     */
+    public static class WarehouseItemServiceImpl<T extends WarehouseItem>
+            extends InMemoryCrudService<T>
+            implements WarehouseItemService<T> {
+
+        @Override
+        public List<T> findAllSortedByNameAndByPrice() {
+            // Secondary sort by price when names are identical
+            Comparator<T> nameAndPriceComparator = Comparator
+                    .<T, String>comparing(BaseEntity::getName, String.CASE_INSENSITIVE_ORDER)
+                    .thenComparingDouble(WarehouseItem::getPrice);
+
+            return findAllSorted(nameAndPriceComparator);
+        }
+    }
+
+    // ==================== 7. Utility Methods ====================
+
+    /**
+     * Print utility method with wildcard upper bound Collection<? extends BaseEntity>.
+     * Level 3.
+     */
+    public static void printAll(Collection<? extends BaseEntity> items) {
+        System.out.println("-----------------------------------------------------------------------------------------");
+        for (BaseEntity item : items) {
+            System.out.println("  -> " + item);
+        }
+        System.out.println("-----------------------------------------------------------------------------------------");
     }
 
     // ==================== Main Method ====================
@@ -416,45 +538,68 @@ public class Main {
         var scanner = new Scanner(System.in);
 
         try {
-            System.out.println("=== Warehouse Management System ===\n");
+            System.out.println("=== Warehouse Management System (Lab 7-9 Integration) ===\n");
 
-            PricingStrategy regularFactoryStrategy = PricingStrategyFactory.createStrategy(StrategyType.REGULAR);
-            PricingStrategy bulkFactoryStrategy = PricingStrategyFactory.createStrategy(StrategyType.BULK_DISCOUNT, 15.0, 20);
+            PricingStrategy regularStrategy = PricingStrategyFactory.createStrategy(StrategyType.REGULAR);
+            PricingStrategy bulkStrategy = PricingStrategyFactory.createStrategy(StrategyType.BULK_DISCOUNT, 15.0, 20);
 
-            System.out.println("--- 1. Chain of Constructors Demonstration ---");
-            System.out.println("Creating Laptop (ElectronicsProduct):");
-            WarehouseItem laptop = new ElectronicsProduct("Laptop", "SKU101", 10, 1000.0, regularFactoryStrategy, 2.3, 24);
+            // Instantiate Generic Service
+            WarehouseItemServiceImpl<WarehouseItem> warehouseService = new WarehouseItemServiceImpl<>();
 
-            System.out.println("\nCreating Milk (PerishableProduct):");
-            WarehouseItem milk = new PerishableProduct("Milk", "SKU102", 50, 2.0, bulkFactoryStrategy, 1.0, LocalDate.now().plusDays(7));
+            System.out.println("--- 1. Demonstrating CRUD Operations (Level 1) ---");
 
-            System.out.println("\n--- 2. Adapter Pattern & Polymorphism ---");
-            ExternalSupplierApi legacyApi = new ExternalSupplierApi();
-            PricingStrategy adapterStrategy = new LegacySupplierAdapter(legacyApi);
-            WarehouseItem keyboard = new ElectronicsProduct("Keyboard", "SKU103", 15, 40.0, adapterStrategy, 0.8, 12);
+            WarehouseItem laptop = new ElectronicsProduct(101L, "Laptop", "SKU101", 10, 1000.0, regularStrategy, 2.3, 24);
+            WarehouseItem milkFresh = new PerishableProduct(102L, "Milk", "SKU102", 50, 2.0, bulkStrategy, 1.0, LocalDate.now().plusDays(7));
+            WarehouseItem milkOrganic = new PerishableProduct(103L, "Milk", "SKU103", 20, 4.5, regularStrategy, 1.0, LocalDate.now().plusDays(5));
+            WarehouseItem keyboard = new ElectronicsProduct(104L, "Keyboard", "SKU104", 15, 40.0, regularStrategy, 0.8, 12);
 
-            WarehouseItem[] inventory = { laptop, milk, keyboard };
+            // Save items
+            warehouseService.save(laptop);
+            warehouseService.save(milkFresh);
+            warehouseService.save(milkOrganic);
+            warehouseService.save(keyboard);
 
-            System.out.println("\n--- Sorting and Printing Reports Polymorphically ---");
-            Arrays.sort(inventory);
-            for (WarehouseItem item : inventory) {
-                item.printReport();
+            System.out.println("Saved 4 items to In-Memory storage:");
+            printAll(warehouseService.findAll());
+
+            // Updating item (ID 101)
+            System.out.println("Updating Laptop (ID 101) with new price...");
+            WarehouseItem updatedLaptop = new ElectronicsProduct(101L, "Laptop Pro", "SKU101", 8, 1300.0, regularStrategy, 2.3, 36);
+            warehouseService.save(updatedLaptop);
+            System.out.println("Total count after update (should remain 4): " + warehouseService.findAll().size());
+
+            // Delete operations
+            System.out.println("Delete ID 104 (Keyboard): " + warehouseService.delete(104L));
+            System.out.println("Delete ID 999 (Non-existent): " + warehouseService.delete(999L));
+
+            // Exception handling on missing ID
+            System.out.println("\nSearching for non-existent ID 999:");
+            try {
+                WarehouseItem found = warehouseService.findById(999L)
+                        .orElseThrow(() -> new EntityNotFoundException(999L));
+            } catch (EntityNotFoundException e) {
+                System.out.println("Caught Expected Exception: " + e.getMessage());
             }
 
-            System.out.println("\n--- 3. Specific Subclass Calls & Pattern Matching ---");
-            for (WarehouseItem item : inventory) {
-                switch (item) {
-                    case ElectronicsProduct electronics -> {
-                        System.out.printf("Found Electronics: %s with weight %.1fkg. ", electronics.getName(), electronics.getWeightKg());
-                        electronics.extendWarranty(6);
-                    }
-                    case PerishableProduct perishable -> {
-                        System.out.printf("Found Perishable item: %s. Expiration: %s%n", perishable.getName(), perishable.getExpirationDate());
-                    }
-                }
-            }
+            // Restore Keyboard for sorting tests
+            warehouseService.save(keyboard);
 
-            System.out.println("\n--- 4. Observer Pattern Demonstration ---");
+            System.out.println("\n--- 2. Sorting Operations & Wildcards (Level 2 & 3) ---");
+
+            System.out.println("Storage BEFORE sorting:");
+            printAll(warehouseService.findAll());
+
+            System.out.println("1. Sorted by Name (findAllSortedByName):");
+            printAll(warehouseService.findAllSortedByName());
+
+            System.out.println("2. Sorted by Name AND Price (Primary: Name, Secondary: Price):");
+            printAll(warehouseService.findAllSortedByNameAndByPrice());
+
+            System.out.println("Storage AFTER sorting (verifying storage was NOT mutated):");
+            printAll(warehouseService.findAll());
+
+            System.out.println("\n--- 3. Observer & Legacy Adapter Integration ---");
+
             StockObserver auditLogger = new AuditLogger();
             StockObserver lowStockNotifier = new LowStockNotifier(5);
 
@@ -464,28 +609,17 @@ public class Main {
             System.out.println("Updating Laptop quantity from 10 to 3...");
             laptop.setQuantity(3);
 
-            System.out.println("\n--- 5. Exception Handling Check ---");
-            System.out.print("Enter test price for a new product: ");
-            double testPrice = scanner.nextDouble();
+            ExternalSupplierApi legacyApi = new ExternalSupplierApi();
+            PricingStrategy adapterStrategy = new LegacySupplierAdapter(legacyApi);
+            keyboard.setPricingStrategy(adapterStrategy);
+            System.out.println("Updated Keyboard pricing strategy using Legacy Adapter.");
+            keyboard.printReport();
 
-            WarehouseItem testProduct = new ElectronicsProduct("TestItem", "SKU000", 10, testPrice, regularFactoryStrategy, 0.5, 6);
-            System.out.println("Product successfully created. Final Price: " + testProduct.getFinalPrice());
-
-        } catch (InputMismatchException e) {
-            System.out.println("INPUT ERROR: Please enter a valid number.");
         } catch (WarehouseException e) {
             System.out.println("DOMAIN ERROR: " + e.getMessage());
-            switch (e) {
-                case InvalidPriceException ipe ->
-                    System.out.println("Rejected price value: " + ipe.getInvalidPrice());
-                case InvalidQuantityException iqe ->
-                    System.out.println("Rejected quantity value: " + iqe.getInvalidQuantity());
-                default -> {}
-            }
         } finally {
-            System.out.println("\nExecuting final cleanup...");
+            System.out.println("\nExecution complete.");
             scanner.close();
-            System.out.println("Scanner closed.");
         }
     }
 }
