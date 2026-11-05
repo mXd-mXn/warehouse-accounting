@@ -6,20 +6,27 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>ua.edu.warehouse</groupId>
-    <artifactId>warehouse-jdbc-system</artifactId>
+    <artifactId>warehouse-hibernate-system</artifactId>
     <version>1.0.0</version>
-    <name>Warehouse JDBC System</name>
+    <name>Warehouse Hibernate System</name>
 
     <properties>
-        <maven.compiler.release>21</maven.compiler.release>
+        <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <hibernate.version>6.5.2.Final</hibernate.version>
         <h2.version>2.2.224</h2.version>
-        <hikaricp.version>5.1.0</hikaricp.version>
         <slf4j.version>2.0.12</slf4j.version>
     </properties>
 
     <dependencies>
-        <!-- H2 Database Engine (змініть на PostgreSQL/MySQL при потребі) -->
+        <!-- Hibernate Core (Jakarta Persistence) -->
+        <dependency>
+            <groupId>org.hibernate.orm</groupId>
+            <artifactId>hibernate-core</artifactId>
+            <version>${hibernate.version}</version>
+        </dependency>
+
+        <!-- H2 Database Engine -->
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
@@ -27,14 +34,7 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- HikariCP: High-performance JDBC Connection Pool -->
-        <dependency>
-            <groupId>com.zaxxer</groupId>
-            <artifactId>HikariCP</artifactId>
-            <version>${hikaricp.version}</version>
-        </dependency>
-
-        <!-- Logging SLF4J (Simple implementation for HikariCP logs) -->
+        <!-- Logging SLF4J -->
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-simple</artifactId>
