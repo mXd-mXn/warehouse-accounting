@@ -176,6 +176,29 @@ classDiagram
 - **`Collection<? extends BaseEntity>`**: Allows `printAll` to accept collections of subtype entities (e.g., `List<ElectronicsProduct>`) without triggering invariant generic compilation errors (`List<ElectronicsProduct>` is not a subtype of `List<BaseEntity>`).
 
 
+# Warehouse Management System (Lab 10 — JDBC Implementation)
+
+## Інструкція зі збірки та запуску проєкту
+1. Клонувати репозиторій та перейти у гілку `lr10/jdbc-warehouse`.
+2. Переконатися, що встановлено Java SDK 21+ та Apache Maven.
+3. Збірка проєкту: `mvn clean compile`
+4. Запуск програми: `mvn exec:java`
+
+---
+
+## Схема Бази Даних (ER-Diagram)
+
+[categories] (1) <------- (0..*) [warehouse_items]
++------------------+             +----------------------+
+| PK id (BIGINT)   |             | PK id (BIGINT)       |
+|    name (VARCHAR)|             |    name (VARCHAR)    |
++------------------+             |    sku (VARCHAR)     |
+								 |    price (NUMERIC)   |
+								 | FK category_id (BIG) |
+								 +----------------------+
+
+---
+
 ## How to launch:
 Download file from github
 
