@@ -184,20 +184,26 @@ classDiagram
 3. Збірка проєкту: `mvn clean compile`
 4. Запуск програми: `mvn exec:java`
 
----
+# Lab 11: Hibernate ORM (Jakarta Persistence)
+Overview
 
-## Схема Бази Даних (ER-Diagram)
+Implementation of CRUDService<T> and WarehouseItemService<T> using Hibernate ORM (Jakarta Persistence). Replaces the JDBC access layer from Lab 10 while maintaining schema validation against init.sql.
 
-[categories] (1) <------- (0..*) [warehouse_items]
-+------------------+             +----------------------+
-| PK id (BIGINT)   |             | PK id (BIGINT)       |
-|    name (VARCHAR)|             |    name (VARCHAR)    |
-+------------------+             |    sku (VARCHAR)     |
-								 |    price (NUMERIC)   |
-								 | FK category_id (BIG) |
-								 +----------------------+
+Architecture & Implementation
+1. Persistence Manager (JpaUtil)
 
----
+Singleton managing EntityManagerFactory. Wraps database operations in scoped transactions (executeInTransaction and executeWithResult), ensuring EntityManager instances are created per request and properly closed.
+2. Entity Mapping & Relationships
+
+    BaseEntity: Annotated with @MappedSuperclass to share common id and name attributes across entities.
+
+    Category: @Entity representing the parent side of a bidirectional @OneToMany(mappedBy = "category") relationship using FetchType.LAZY. Includes addItem() and removeItem() helper methods to maintain in-memory reference consistency.
+
+    WarehouseItemEntity: Owning @Entity containing the foreign key via @ManyToOne. Enum fields are mapped using @Enumerated(EnumType.STRING).
+
+3. Service Layer (HibernateWarehouseItemServiceImpl)
+
+Implements standard CRUD operations (findById, save, delete, findAll, findAllSortedByName) via JPA EntityManager transactions. Throws EntityNotFoundException when entities cannot be located for lookup or deletion.
 
 ## How to launch:
 Download file from github
